@@ -1,8 +1,9 @@
 """A test program for the wavl24 package.
 
-plotd4.py plots some Daubechies 4-coefficient wavelets
+wavltests.py can make various plots using Daubechies 4-coefficient
+wavelets.
 """
-THIS_IS = 'plotd4.py 2/3/24 D. Candela'
+THIS_IS = 'wavltests.py 2/3/24 D. Candela'
 
 import numpy as np
 from numpy import sqrt
@@ -51,6 +52,17 @@ def plot32():
         plt.legend()
         plt.show()
 
+def showrand(nn,nnshow=None):
+    """Tests dwt display function wavl.showdwt with a dwt of size nn
+    populated with random numbers.  Supply nnshow<nn to truncate
+    display to nnshow elements.
+    """
+    rng = np.random.default_rng(2024)   # get seeded random number gen
+    dwt = rng.normal(size=nn)            # use gaussian-distributed elements
+    wavl.showdwt(dwt,nnshow)
+    plt.title(f'Random dwt with N={nn}, Nshow={nnshow}')
+    plt.show()
+
 """************ RUN TEST FUNCTIONS *****************"""
 if __name__=='__main__':
     print(f'This is: {THIS_IS}')
@@ -58,4 +70,6 @@ if __name__=='__main__':
     
 #    nr3plots()
     
-    plot32()
+#    plot32()
+    
+    showrand(nn=1024,nnshow=64)

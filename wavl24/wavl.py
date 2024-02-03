@@ -6,14 +6,29 @@ as NR3, esp. Sec. 13.10 from which some code in this module was adapted. Note
 pywavelets (not used here) is a much more complete and advanced wavelet
 package than this module.
 """
-THIS_IS = 'wavl.py 2/2/24 D. Candela'
+THIS_IS = 'wavl.py 2/3/24 D. Candela'
 
 import numpy as np
 from numpy import sqrt
+import matplotlib.pyplot as plt
 
 """ **********************************************************************
       FUNCTIONS
 ************************************************************************** """
+def getl(nn,nnmin=4):
+    """Finds l such that nn = 2**l, errors out if nn<nnmin or nn is
+    not a power of 2.
+    """
+    if nn>=nnmin:
+        nn1 = nn
+        l = 0
+        while not nn1&1:  # while last bit is 0
+            nn1 >>= 1
+            l += 1
+        if nn1==1:
+            return l
+    raise Exception(f'nn={nn} is not >={nnmin} and a power of 2.')
+
 def wt1(a,wlet,forward=True):
     """One-dimensional discrete wavelet transform.  Adapted from NR3 Sec.
     13.10.2
@@ -45,6 +60,63 @@ def wt1(a,wlet,forward=True):
             wlet.filt(a,nn,False)
             nn <<= 1
         wlet.condition(a,n,False)
+
+
+def showdwt(dwt,nnshow=None,asp=0.6):
+    """Uses plt.imshow to make a graphical plot of a 1D discrete
+    wavelet transform.  For flexibility, does not call plt.figure at
+    start or plot.show at end.
+    
+    In the plot:
+        dwt[0..3] will be bottom row, assumed coarsest elements
+        dwt[4..7] will be next row up
+        dwt[8..15] will be next row up
+        dwt[16..31] will be next row up
+        ...
+    
+    Parameters
+    ----------
+    dwt : array (nn) of float
+        1D discrete wavelet transform, errors out if nn not a power
+        of 2 and >=4.  dwt could also be some function of the dwt e.g.
+        its square.
+    nnshow : int or None
+        If provided must be a power of two <= nn, will only show
+        first nnshow components.
+    asp : float
+        Desired aspect ratio (height/width)
+    
+    Side effects
+    ------------
+    calls plt.imshow
+    """
+    if nnshow:
+        dwt = dwt[:nnshow]
+    nn = dwt.size
+    l = getl(nn)
+    # Width in pixels of the plot will be nn/2, and there will be l-1 rows
+    # of height sgv in pixels.  Choose sgv and get array to hold plot.
+    nn2 = nn//2       # integer nn/2 = pixels in horizontal direction of plot
+    sgv = round(asp*nn2/(l-1))
+    ppv = (l-1)*sgv    # pixels in vertical direction of plot
+    sg = np.zeros((ppv,nn2))
+
+    jdwt = 0  # index of next element of dwt to be shown
+    for row in range(l-1):   # row number counting up from bottom
+        # Bottom+1 and top pixels for this row.
+        pb = ppv - sgv*row
+        pt = pb - sgv
+        # Number of columns in this row 4,4,8,16,32...
+        cols = max(4,2**(row+1))
+        sgh = nn2//cols  # horizontal pixels in each column
+        for col in range(cols):
+            # Left and right+1 pixels for this column.
+            pl = sgh*col
+            pr = pl + sgh
+            # Fill in pixels for this element of dwt and advance index.
+            sg[pt:pb,pl:pr] = dwt[jdwt]
+            jdwt += 1    
+    plt.imshow(sg)
 
 
 """ **********************************************************************
