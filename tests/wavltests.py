@@ -33,7 +33,7 @@ def nr3plots(tp=None):
     plt.show()
     
 def plot32(tp=None):
-    """Plot all 32 basis vectors with N=32, compare with same-numbered
+    """Plot first 32 basis vectors with N=128, compare with same-numbered
     basis vectors with N=1024.
     
     Parameters
@@ -43,33 +43,33 @@ def plot32(tp=None):
     """
     wavelet = wavl.getfilter(tp)
     # x arrays for the two different length vectors.
-    x32 = np.arange(0.,1.,1/32)
+    x128 = np.arange(0.,1.,1/128)
     x1024 = np.arange(0.,1.,1/1024)
     for nb in range(32):
-        a32 = np.zeros(32)
-        a32[nb] = 1.0
-        wavl.wt1(a32,wavelet,forward=False)
+        a128 = np.zeros(128)
+        a128[nb] = 1.0
+        wavl.wt1(a128,wavelet,forward=False)
         # Scale to 1024 amplitude.
-        a32 *= sqrt(32/1024)
+        a128 *= sqrt(128/1024)
 
         a1024 = np.zeros(1024)
         a1024[nb] = 1.0
         wavl.wt1(a1024,wavelet,forward=False)
 
-        plt.title(f'nb={nb}')
-        plt.plot(x32,a32,label='N=32')
+        plt.title(f'tp={tp} nb={nb}')
+        plt.plot(x128,a128,label='N=128')
         plt.plot(x1024,a1024,label='N=1024')
         plt.legend()
         plt.show()
 
-def showrand(nn,nnshow=None):
+def showrand(nn,nnshow=None,dots=()):
     """Tests dwt display function wavl.showdwt with a dwt of size nn
     populated with random numbers.  Supply nnshow<nn to truncate
     display to nnshow elements.
     """
     rng = np.random.default_rng(2024)   # get seeded random number gen
     dwt = rng.normal(size=nn)            # use gaussian-distributed elements
-    wavl.showdwt(dwt,nnshow)
+    wavl.showdwt(dwt,nnshow,dots=dots)
     plt.title(f'Random dwt with N={nn}, Nshow={nnshow}')
     plt.show()
     
@@ -96,22 +96,21 @@ def wt_iwt(nn,ns,tp=None):
     # Do iwt to get sum of corresponding wavelets, plot result.
     wavl.wt1(a,wavelet,forward=False)
     plt.plot(a)
-    plt.title(f'Sum of basis vectors {ns}')
+    plt.title(f'tp = {tp}, sum of basis vectors {ns}')
     plt.show()
     # Do iwt, display.
     wavl.wt1(a,wavelet)
-    wavl.showdwt(a)
+    wavl.showdwt(a,dots=ns)
     plt.title(f'Sum of basis vectors {ns}')
-    plt.colorbar()
+    # plt.colorbar()
     plt.show()
 
 
 """************ RUN TEST FUNCTIONS *****************"""
 if __name__=='__main__':
     print(f'This is: {THIS_IS}')
-    print(f'Using: {wavl.THIS_IS}')
-    
+    print(f'Using: {wavl.THIS_IS}')   
     # nr3plots()    
-    # plot32()
-    # showrand(nn=1024,nnshow=128)
-    wt_iwt(1024,(33,40,99))
+    # plot32(tp=8)
+    # showrand(nn=1024,nnshow=128,dots=(0,7,11))
+    wt_iwt(1024,(9,54,),tp=20)
