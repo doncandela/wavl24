@@ -6,7 +6,7 @@ as NR3, esp. Sec. 13.10 from which some code in this module was adapted. Note
 pywavelets (not used here) is a much more complete and advanced wavelet
 package than this module.
 """
-THIS_IS = 'wavl.py 2/7/24 D. Candela'
+THIS_IS = 'wavl.py 2/8/24 D. Candela'
 
 import numpy as np
 from numpy import sqrt
@@ -15,6 +15,27 @@ import matplotlib.pyplot as plt
 """ **********************************************************************
       FUNCTIONS
 ************************************************************************** """
+def getwavelet(wltype='daub',p=None):
+    """Get wavelet filer of specified type and order, error if unimplemented.
+    
+    Parameters
+    ----------
+    wavtype : str
+        'daub' - Use Daubechies wavelets.  p=None uses the p=2 Daub4 class,
+        otherwise the Daubs class is used with the specified p=1,2,3...
+    p : int or None
+        Order of wavelet filter.
+    
+    """
+    if wltype=='daub':
+        if p:
+            wavelet = Daubs(p)
+        else:
+            wavelet = Daub4()
+    else:
+        raise NotImplementedError(f'wltype=\'{wltype}\' not recognized.')
+    return wavelet
+
 def getl(nn,nnmin=4):
     """Finds l such that nn = 2**l, errors out if nn<nnmin or nn is
     not a power of 2.
@@ -44,7 +65,7 @@ def wt1(a,wavelet,forward=True):
     forward : bool
     """
     nn = a.size
-    getl(nn,nnmin=1)
+    getl(nn,nnmin=1)    # check nn is power of 2
     if nn<4:
         return
     if forward:
@@ -61,6 +82,32 @@ def wt1(a,wavelet,forward=True):
             wavelet.filt(a,n,False)
             n <<= 1
         wavelet.condition(a,nn,False)
+
+def bwavs(nn,ns,wavelet):
+    """Compute normalized sum of one or more basis wavelets.
+    
+    Parameters
+    ----------
+    nn : int
+        Number of points in data, error if not power of 2.
+    ns : int,int...
+        Which basis functions to use, each 0...nn-1.
+    wavelet: Wavelet
+        Wavelet filter to use.
+        
+    Returns
+    -------
+    a : array (nn) of float
+        Normalized sum of the basis wavelets specified by ns.
+    """
+    # Make normalized data with weight in specified basis functions.
+    a = np.zeros(nn)
+    wgt = 1/sqrt(len(ns))
+    for n in ns:
+        a[n] = wgt
+    # Do iwt to get sum of corresponding wavelets, return result.
+    wt1(a,wavelet,forward=False)
+    return a
 
 def showdwt(dwt,nnshow=None,asp=0.6,dots=()):
     """Uses plt.imshow to make a graphical plot of a 1D discrete wavelet
@@ -125,20 +172,19 @@ def showdwt(dwt,nnshow=None,asp=0.6,dots=()):
             sg[pt:pb,pl:pr] = dwt[jdwt]
             # If requested to draw dot on this element, find x and y of dot.
             if jdwt in dots:
-                dotxs.append((pl+pr)/2)
-                dotys.append((pb+pt)/2)
+                dotxs.append((pl+pr-1)/2)
+                dotys.append((pb+pt-1)/2)
             jdwt += 1  # advance element index.
     # Put red dots at centers of image elements for specified basis vecs.
     if dotxs:
         plt.scatter(dotxs,dotys,color='red',s=40)
     plt.imshow(sg)
 
-
 """ **********************************************************************
        CLASSES FOR WAVELET TYPES
 ************************************************************************** """
 class Wavelet:
-    """Base class for wavelets. Adapted from NR3 Sec. 13.10.2
+    """Base class for wavelet filters. Adapted from NR3 Sec. 13.10.2
     """
     def filt(self,a,n,forward):
         """Applies wavelet filter (if forward is true) or its transpose
@@ -148,127 +194,12 @@ class Wavelet:
         """Pre-conditioning and post-conditioning.
         """
 
-def getfilter(tp):
-    """Helper function: Gets specified wavelet filter.
-
-    Parameters
-    ----------
-    tp : None or int
-        If None, use Daubechies-4 filter from class Daub4. Otherwise use
-        Daubechies-tp filter from class Daubs, with tp=4,6...
-        
-    Returns
-    -------
-    wavelet : Wavelet
-    """
-    if tp:
-        return Daubs(tp)
-    return Daub4()
-
-def daubccs(tp):
-    """Helper for Daubechies wavelet classes: Returns the tp = 2*p filter
-    coefficients for an order-p filter. This version only works for tp=4,6,8.
-    
-    For tp=4,6 the analytical formulas in NR3 Sec. 13.10.1 are used. For tp>=8
-    the coefficients tabulated in https://wavelets.pybytes.com/wavelet/db4/
-    etc. are used - in this website these are called the "reconstruction
-    low-pass filter coefficients".
-    
-    Parameters
-    ----------
-    tp : int in 2,4,6,8,10,20
-        Number of coefficients returned.
-    
-    Returns
-    -------
-    cc : array (tp) of float
-        Daubechies filter coefficients.
-    """
-    if tp==2:
-        cc = np.zeros(2)
-        d2d = sqrt(2)
-        cc[:] = (1/d2d,
-                 1/d2d)
-        return cc
-    if tp==4:
-        cc = np.zeros(4)
-        s3 = sqrt(3)
-        d4d = 4*sqrt(2)
-        cc[:] = ((1 + s3)/d4d,
-                 (3 + s3)/d4d,
-                 (3 - s3)/d4d,
-                 (1 - s3)/d4d)
-        return cc
-    elif tp==6:
-        cc = np.zeros(6)
-        s10 = sqrt(10)
-        s52 = sqrt(5 + 2*s10)
-        d6d = 16*sqrt(2)
-        cc[:] = ((1 + s10 + s52)/d6d,
-                 (5 + s10 + 3*s52)/d6d,
-                 (10 - 2*s10 + 2*s52)/d6d,
-                 (10 - 2*s10 - 2*s52)/d6d,
-                 (5 + s10 -3*s52)/d6d,
-                 (1 + s10 - s52)/d6d)       
-        return cc
-    elif tp==8:
-        cc = np.zeros(8)
-        cc[:] = (0.23037781330885523,
-                 0.7148465705525415,
-                 0.6308807679295904,
-                 -0.02798376941698385,
-                 -0.18703481171888114,
-                 0.030841381835986965,
-                 0.032883011666982945,
-                 -0.010597401784997278)
-        return cc
-    elif tp==10:
-        cc = np.zeros(10)
-        cc[:] = (0.160102397974125,
-                 0.6038292697974729,
-                 0.7243085284385744,
-                 0.13842814590110342,
-                 -0.24229488706619015,
-                 -0.03224486958502952,
-                 0.07757149384006515,
-                 -0.006241490213011705,
-                 -0.012580751999015526,
-                 0.003335725285001549)
-        return cc
-    elif tp==20:
-        cc = np.zeros(20)
-        cc[:] = (0.026670057900950818,
-                 0.18817680007762133,
-                 0.5272011889309198,
-                 0.6884590394525921,
-                 0.2811723436604265,
-                 -0.24984642432648865,
-                 -0.19594627437659665,
-                 0.12736934033574265,
-                 0.09305736460380659,
-                 -0.07139414716586077,
-                 -0.02945753682194567,
-                 0.03321267405893324,
-                 0.0036065535669883944,
-                 -0.010733175482979604,
-                 0.0013953517469940798,
-                 0.00199240529499085,
-                 -0.0006858566950046825,
-                 -0.0001164668549943862,
-                 9.358867000108985e-05,
-                 -1.326420300235487e-05)
-        return cc
-    else:
-        raise Exception(f'Daubechies size {tp} is not among implemented'
-                        ' values 2,4,6,8,10,20')
-
 class Daub4(Wavelet):
     """Daubechies 4-coefficient wavelet, adapted from NR3 Sec. 13.10.2. Should
-    give same results as Daubs(tp=4) if alternative centering is used in Daubs.
+    give same results as Daubs(p=2) if alternative centering is used in Daubs.
     """
     def __init__(self):
-        self.ccs = daubccs(4)   # get and save D4 filter coefficients
-        
+        self.ccs = daubccs(2)   # get and save p=2 filter coefficients      
     def filt(self,a,n,forward):
         """Applies wavelet filter (if forward is true) or its transpose
         (otherwise) to a[0..n-1]. Called hierarchically by wt1 and wtn.
@@ -296,31 +227,30 @@ class Daub4(Wavelet):
         a[:n] = ws[:n]
 
 class Daubs(Wavelet):
-    """Daubechies tp-coefficient wavelet for tp=4,6... Adapted from NR3
+    """Daubechies order-p wavelet for p=1,2... Adapted from NR3
     Sec. 13.10.2.
     
     Parameters
     ----------
-    tp : int
-        Number of coefficients 4,6... = 2*order of filter.  Allowed values
-        are those allowed by daubscc.
+    p : int
+        Order 1,2,3... of filter.  Allowed values are those allowed by daubscc.
     """
-    def __init__(self,tp):
-        self.tp = tp
-        self.ccs = daubccs(tp)   # get and save D4 filter coefficients
+    def __init__(self,p):
+        self.tp = 2*p           # number of coefficients
+        self.ccs = daubccs(p)   # get and save D4 filter coefficients
         # Get reverse coefficients.
         self.ccrs = np.zeros_like(self.ccs)
         sig = -1.0
-        for i in range(tp):
-            self.ccrs[tp-1-i] = sig*self.ccs[i]
+        for i in range(self.tp):
+            self.ccrs[self.tp-1-i] = sig*self.ccs[i]
             sig = -sig
         # Standard centering.
-        self.ioff = -(tp>>1)
+        # TODO check what this does and if correct, simplify
+        self.ioff = -(self.tp>>1)
         self.joff = self.ioff
         # Alternate centering, used by Daub4
         self.ioff = -2
-        self.joff = -tp + 2
-
+        self.joff = -self.tp + 2
     def filt(self,a,n,forward):
         """Applies wavelet filter (if forward is true) or its transpose
         (otherwise) to a[0..n-1]. Called hierarchically by wt1 and wtn.
@@ -355,4 +285,90 @@ class Daubs(Wavelet):
                     ws[jr] += self.ccrs[k]*ai1
         a[:n] = ws[:n]
 
+
+def daubccs(p):
+    """Helper for Daubechies wavelet classes: Returns the 2*p filter 
+    coefficients for an order-p filter.
+    
+    For p=1,2,3 the analytical formulas in NR3 Sec. 13.10.1 are used. For p>=4
+    the coefficients tabulated in https://wavelets.pybytes.com/wavelet/db4/
+    etc. are used - in this website these are called the "reconstruction
+    low-pass filter coefficients".
+    
+    Parameters
+    ----------
+    p : int
+        Order of filter 1,2,3... This function errors out if not implemented.
+    
+    Returns
+    -------
+    ccs : array (2*p) of float
+        Daubechies filter coefficients.
+    """
+    # Make dict of coefficients for implemented p's.
+    dn1 = sqrt(2)      # for p=1
+    s3 = sqrt(3)
+    dn2 = 4*sqrt(2)    # for p-2
+    s10 = sqrt(10)
+    s52 = sqrt(5 + 2*s10)
+    dn3 = 16*sqrt(2)   # for p=3
+    ccd = {1: (1/dn1,
+               1/dn1),
+           2: ((1 + s3)/dn2,
+               (3 + s3)/dn2,
+               (3 - s3)/dn2,
+               (1 - s3)/dn2),
+           3: ((1 + s10 + s52)/dn3,
+               (5 + s10 + 3*s52)/dn3,
+               (10 - 2*s10 + 2*s52)/dn3,
+               (10 - 2*s10 - 2*s52)/dn3,
+               (5 + s10 -3*s52)/dn3,
+               (1 + s10 - s52)/dn3),
+           4: (0.23037781330885523,
+               0.7148465705525415,
+               0.6308807679295904,
+               -0.02798376941698385,
+               -0.18703481171888114,
+               0.030841381835986965,
+               0.032883011666982945,
+               -0.010597401784997278),
+           5: (0.160102397974125,
+               0.6038292697974729,
+               0.7243085284385744,
+               0.13842814590110342,
+               -0.24229488706619015,
+               -0.03224486958502952,
+               0.07757149384006515,
+               -0.006241490213011705,
+               -0.012580751999015526,
+               0.003335725285001549),
+           10: (0.026670057900950818,
+                0.18817680007762133,
+                0.5272011889309198,
+                0.6884590394525921,
+                0.2811723436604265,
+                -0.24984642432648865,
+                -0.19594627437659665,
+                0.12736934033574265,
+                0.09305736460380659,
+                -0.07139414716586077,
+                -0.02945753682194567,
+                0.03321267405893324,
+                0.0036065535669883944,
+                -0.010733175482979604,
+                0.0013953517469940798,
+                0.00199240529499085,
+                -0.0006858566950046825,
+                -0.0001164668549943862,
+                9.358867000108985e-05,
+                -1.326420300235487e-05)}
+    ps = tuple(ccd.keys())
+    if p in ps:
+        ccs = np.zeros(2*p)
+        ccs[:] = ccd[p]
+        return ccs
+    else:
+        raise NotImplementedError(f'Daubechies order {p} is not among'
+                        f' implemented values {ps}')
+    
 """ ******************** end of module wavl.py *************************** """
