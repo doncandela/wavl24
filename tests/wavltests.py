@@ -30,6 +30,13 @@ def nr3plots():
     plt.plot(a)
     plt.title('Daubechies p=2, basis wavelets 9+57')
     plt.show()
+    # Plot like NR3 Fig. 13.10.2 top: Lemarie basis wavelets 9+57.
+    wavelet = wavl.getwavelet(wltype='lemar',nn=1024)
+    a = wavl.bwavs(1024,(9,57),wavelet)
+    plt.plot(a)
+    plt.title('Lemarie basis wavelets 9+57')
+    plt.show()
+
 
 def plot32(wltype='daub',p=2):
     """Plot first 32 basis vectors with N=128, compare with same-numbered
@@ -108,7 +115,7 @@ def wt_iwt(nn,ns,wltype='daub',p=2):
 if __name__=='__main__':
     print(f'This is: {THIS_IS}')
     print(f'Using: {wavl.THIS_IS}')   
-    # nr3plots()    
+    nr3plots()    
     # plot32(p=3)
     # showrand(nn=1024,nnshow=128,dots=(0,7,122))
-    wt_iwt(1024,(18,),p=4)
+    # wt_iwt(1024,(18,),p=4)

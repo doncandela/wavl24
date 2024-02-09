@@ -6,32 +6,41 @@ as NR3, esp. Sec. 13.10 from which some code in this module was adapted. Note
 pywavelets (not used here) is a much more complete and advanced wavelet
 package than this module.
 """
-THIS_IS = 'wavl.py 2/8/24 D. Candela'
+THIS_IS = 'wavl.py 2/9/24 D. Candela'
 
 import numpy as np
-from numpy import sqrt
+from numpy import sqrt,sin
 import matplotlib.pyplot as plt
 
 """ **********************************************************************
       FUNCTIONS
 ************************************************************************** """
-def getwavelet(wltype='daub',p=None):
+def getwavelet(wltype='daub',p=None,nn=None):
     """Get wavelet filer of specified type and order, error if unimplemented.
     
     Parameters
     ----------
-    wavtype : str
+    wltype : str
         'daub' - Use Daubechies wavelets.  p=None uses the p=2 Daub4 class,
         otherwise the Daubs class is used with the specified p=1,2,3...
+
+        'lemar' - Use Lemarie wavelets, which have order p=4. For 'lemar' the
+        rgument p is ignored.
     p : int or None
-        Order of wavelet filter.
-    
+        Typically order of wavelet filter (usage depends on wltype as above).
+    nn : int or None
+        Number of points in data - must be supplied when wltype is 'lemar',
+        must be power of two.
     """
     if wltype=='daub':
         if p:
-            wavelet = Daubs(p)
+            wavelet = Daubs(p=p)
         else:
             wavelet = Daub4()
+    elif wltype=='lemar':
+        if not nn:
+            raise Exception('Must supply data size nn for Lemarie wavelet.')
+        wavelet = Lemarie(nn=nn)
     else:
         raise NotImplementedError(f'wltype=\'{wltype}\' not recognized.')
     return wavelet
@@ -59,13 +68,19 @@ def wt1(a,wavelet,forward=True):
     a : array (nn) of float
         Input array, which this function replaces by its wavelet transform
         (if forward is true) or inverse transform (otherwise). nn must be a
-        power of 2.
+        power of 2.  If the wavlet type is Lemarie (wltype='lemar' supplied to
+        getwavelet), nn must equal nn supplied to getwavelet.
     wavelet: Wavelet
         Wavelet filter to use.
     forward : bool
     """
     nn = a.size
     getl(nn,nnmin=1)    # check nn is power of 2
+    if hasattr(wavelet,'nn'):
+        if nn!=wavelet.nn:
+            raise Exception(f'For this type of wavelet data size {nn}'
+                            f' must match size supplied {wavelet.nn} when'
+                            ' wavelet was initiated.')
     if nn<4:
         return
     if forward:
@@ -236,21 +251,22 @@ class Daubs(Wavelet):
         Order 1,2,3... of filter.  Allowed values are those allowed by daubscc.
     """
     def __init__(self,p):
-        self.tp = 2*p           # number of coefficients
-        self.ccs = daubccs(p)   # get and save D4 filter coefficients
+        self.ccs = daubccs(p)        # get and save filter coefficients
+        self.ncof = len(self.ccs)    # number of coefficients
         # Get reverse coefficients.
         self.ccrs = np.zeros_like(self.ccs)
         sig = -1.0
-        for i in range(self.tp):
-            self.ccrs[self.tp-1-i] = sig*self.ccs[i]
+        for i in range(self.ncof):
+            self.ccrs[self.ncof-1-i] = sig*self.ccs[i]
             sig = -sig
         # Standard centering.
         # TODO check what this does and if correct, simplify
-        self.ioff = -(self.tp>>1)
+        self.ioff = -(self.ncof>>1)
         self.joff = self.ioff
-        # Alternate centering, used by Daub4
+        # Alternate centering, used by Daub4.
+        # TODO noticed with this centering basis wavelets shift less with nn
         self.ioff = -2
-        self.joff = -self.tp + 2
+        self.joff = -self.ncof + 2
     def filt(self,a,n,forward):
         """Applies wavelet filter (if forward is true) or its transpose
         (otherwise) to a[0..n-1]. Called hierarchically by wt1 and wtn.
@@ -258,7 +274,7 @@ class Daubs(Wavelet):
         if n<4:
             return
         ws = np.zeros(n)
-        nmod = self.tp*n       # a positive constant equal to zero mod n
+        nmod = self.ncof*n       # a positive constant equal to zero mod n
         n1 = n-1               # mask of all bits, since n is a power of 2
         nh = n>>1
         if forward:
@@ -266,7 +282,7 @@ class Daubs(Wavelet):
             for ii,i in enumerate(range(0,n,2)):
                 ni = i + 1 + nmod + self.ioff
                 nj = i + 1 + nmod + self.joff
-                for k in range(self.tp):
+                for k in range(self.ncof):
                     jf = n1 & (ni + k + 1)
                     jr = n1 & (nj + k + 1)
                     ws[ii] += self.ccs[k]*a[jf]
@@ -278,7 +294,7 @@ class Daubs(Wavelet):
                 ai1 = a[ii+nh]
                 ni = i + 1 + nmod + self.ioff
                 nj = i + 1 + nmod + self.joff
-                for k in range(self.tp):
+                for k in range(self.ncof):
                     jf = n1 & (ni + k + 1)
                     jr = n1 & (nj + k + 1)
                     ws[jf] += self.ccs[k]*ai
@@ -370,5 +386,105 @@ def daubccs(p):
     else:
         raise NotImplementedError(f'Daubechies order {p} is not among'
                         f' implemented values {ps}')
+
+class Lemarie(Wavelet):
+    """Lemarie wavelet, which has order p=4.  Pieced together from info in NR3
+    Sec. 13.10.4 but might not be most efficient way to do this.
     
+    Since the number of coefficients is equal to the data size nn, nn is
+    fixed for each Lemarie object.
+    
+    Parameters
+    ----------
+    nn : int
+        Size of data to be used.  Size of data array a passed to wt1 must
+        match nn.
+    """
+    def __init__(self,nn=None):
+        self.nn = nn
+        self.ccs = lemarccs(nn)       # get and save filter coefficients
+        self.ncof = len(self.ccs)     # number of coefficients, will equal nn
+        # Get reverse coefficients.
+        self.ccrs = np.zeros_like(self.ccs)
+        sig = -1.0
+        for i in range(self.ncof):
+            self.ccrs[self.ncof-1-i] = sig*self.ccs[i]
+            sig = -sig
+        # Standard centering.
+        # TODO check what this does and if correct, simplify
+        self.ioff = -(self.ncof>>1)
+        self.joff = self.ioff
+        # Alternate centering, used by Daub4.
+        # TODO noticed with this centering basis wavelets shift less with nn
+        self.ioff = -2
+        self.joff = -self.ncof + 2
+    def filt(self,a,n,forward):
+        """Applies wavelet filter (if forward is true) or its transpose
+        (otherwise) to a[0..n-1]. Called hierarchically by wt1 and wtn.
+        """
+        if n<4:
+            return
+        ws = np.zeros(n)
+        nmod = self.ncof*n       # a positive constant equal to zero mod n
+        n1 = n-1               # mask of all bits, since n is a power of 2
+        nh = n>>1
+        if forward:
+            # Apply filter.
+            for ii,i in enumerate(range(0,n,2)):
+                ni = i + 1 + nmod + self.ioff
+                nj = i + 1 + nmod + self.joff
+                for k in range(self.ncof):
+                    jf = n1 & (ni + k + 1)
+                    jr = n1 & (nj + k + 1)
+                    ws[ii] += self.ccs[k]*a[jf]
+                    ws[ii+nh] += self.ccrs[k]*a[jr]
+        else:
+            # Apply transpose filter.
+            for ii,i in enumerate(range(0,n,2)):
+                ai = a[ii]
+                ai1 = a[ii+nh]
+                ni = i + 1 + nmod + self.ioff
+                nj = i + 1 + nmod + self.joff
+                for k in range(self.ncof):
+                    jf = n1 & (ni + k + 1)
+                    jr = n1 & (nj + k + 1)
+                    ws[jf] += self.ccs[k]*ai
+                    ws[jr] += self.ccrs[k]*ai1
+        a[:n] = ws[:n]
+
+def lemarccs(nn):
+     """Helper for Lemarie wavelet class: Returns the nn filter  coefficients
+     used for data of size nn.
+     
+     Parameters
+     ----------
+     nn : int
+         Size of data to be used. Errors out if not a power of 2.
+     
+     Returns
+     -------
+     ccs : array (nn) of float
+         Lemarie filter coefficients.
+     """
+     getl(nn,nnmin=1)       # check nn is power of 2
+     
+     ccs = np.ones(nn)    # TODO dummy
+     return ccs
+ 
+def hh(om):
+    """Helper for lemarccs: Compute H(omega) = FT of filter coefficients.
+    
+    Parameters
+    ----------
+    om : float
+        Frequency, will be in range 0..(nn-1) where nn is data size.
+    """
+    u = sin(om/2)**2
+    v = sin(om)**2
+    hh = sqrt(2*(1-u)**4 * (315 - 420*u + 126*u**2 - 4*u**3)/
+                           (315 - 420*v + 126*v**2 - 4*v**3))
+    return hh
+                     
+     
+         
 """ ******************** end of module wavl.py *************************** """
