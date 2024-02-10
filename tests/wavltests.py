@@ -2,7 +2,7 @@
 
 wavltests.py can make various plots using Daubechies wavelets.
 """
-THIS_IS = 'wavltests.py 2/8/24 D. Candela'
+THIS_IS = 'wavltests.py 2/10/24 D. Candela'
 
 import numpy as np
 from numpy import sqrt
@@ -31,11 +31,11 @@ def nr3plots():
     plt.title('Daubechies p=2, basis wavelets 9+57')
     plt.show()
     # Plot like NR3 Fig. 13.10.2 top: Lemarie basis wavelets 9+57.
-    wavelet = wavl.getwavelet(wltype='lemar',nn=1024)
-    a = wavl.bwavs(1024,(9,57),wavelet)
-    plt.plot(a)
-    plt.title('Lemarie basis wavelets 9+57')
-    plt.show()
+    # wavelet = wavl.getwavelet(wltype='lemar',nn=1024)
+    # a = wavl.bwavs(1024,(9,57),wavelet)
+    # plt.plot(a)
+    # plt.title('Lemarie basis wavelets 9+57')
+    # plt.show()
 
 
 def plot32(wltype='daub',p=2):

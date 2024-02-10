@@ -6,7 +6,7 @@ as NR3, esp. Sec. 13.10 from which some code in this module was adapted. Note
 pywavelets (not used here) is a much more complete and advanced wavelet
 package than this module.
 """
-THIS_IS = 'wavl.py 2/9/24 D. Candela'
+THIS_IS = 'wavl.py 2/10a/24 D. Candela'
 
 import numpy as np
 from numpy import sqrt,sin
@@ -275,7 +275,6 @@ class Daubs(Wavelet):
             return
         ws = np.zeros(n)
         nmod = self.ncof*n       # a positive constant equal to zero mod n
-        n1 = n-1               # mask of all bits, since n is a power of 2
         nh = n>>1
         if forward:
             # Apply filter.
@@ -283,8 +282,8 @@ class Daubs(Wavelet):
                 ni = i + 1 + nmod + self.ioff
                 nj = i + 1 + nmod + self.joff
                 for k in range(self.ncof):
-                    jf = n1 & (ni + k + 1)
-                    jr = n1 & (nj + k + 1)
+                    jf = (ni + k + 1)%n
+                    jr = (nj + k + 1)%n
                     ws[ii] += self.ccs[k]*a[jf]
                     ws[ii+nh] += self.ccrs[k]*a[jr]
         else:
@@ -295,8 +294,8 @@ class Daubs(Wavelet):
                 ni = i + 1 + nmod + self.ioff
                 nj = i + 1 + nmod + self.joff
                 for k in range(self.ncof):
-                    jf = n1 & (ni + k + 1)
-                    jr = n1 & (nj + k + 1)
+                    jf = (ni + k + 1)%n
+                    jr = (nj + k + 1)%n
                     ws[jf] += self.ccs[k]*ai
                     ws[jr] += self.ccrs[k]*ai1
         a[:n] = ws[:n]
